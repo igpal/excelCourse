@@ -5,11 +5,13 @@ import { isCell, matrix, shoudResize, nextSelector } from './table.functions';
 import { resizeHeandler } from './table.resize';
 import { createTable } from './table.template';
 import { TableSelection } from './TableSelectiom';
-
+import * as actions from '../../redux/action';
+import { defaultStyles } from '../../constants';
+import { parse } from '../../core/parse';
 export class Table extends ExcelComponent {
   static className = 'excel__table';
   toHTML() {
-    return createTable(30);
+    return createTable(30, this.store.getState());
   }
 
   constructor($root, options) {
@@ -30,8 +32,19 @@ export class Table extends ExcelComponent {
     const $cell = this.$root.find('[data-id="0:0"]');
     this.selectCell($cell);
 
-    this.$on('formula:input', (text) => {
-      this.selection.current.text(text);
+    this.$on('formula:input', (value) => {
+      this.selection.current.attr('data-value', value).text(parse(value));
+      this.updateTextInStore(value);
+    });
+
+    this.$on('toolbar:applyStyle', (value) => {
+      this.selection.applyStyle(value);
+      this.$dispatch(
+        actions.applyStyle({
+          value,
+          ids: this.selection.selectedIds,
+        })
+      );
     });
 
     this.$on('formula:done', () => this.selection.current.focus());
@@ -40,11 +53,23 @@ export class Table extends ExcelComponent {
   selectCell($cell) {
     this.selection.select($cell);
     this.$emit('table:select', $cell);
+    const styles = $cell.getStyles(Object.keys(defaultStyles));
+    this.$dispatch(actions.changeStyles(styles));
+    console.log(styles);
+  }
+
+  async resizeTable(event) {
+    try {
+      const data = await resizeHeandler(event, this.$root);
+      this.$dispatch(actions.tableResize(data));
+    } catch (error) {
+      console.warn(error);
+    }
   }
 
   onMousedown(event) {
     if (shoudResize(event)) {
-      resizeHeandler(event, this.$root);
+      this.resizeTable(event);
     } else if (isCell(event)) {
       const $target = $(event.target);
 
@@ -54,7 +79,7 @@ export class Table extends ExcelComponent {
         );
         this.selection.selectGroup($cells);
       } else {
-        this.selection.select($target);
+        this.selectCell($target);
       }
     }
   }
@@ -78,7 +103,17 @@ export class Table extends ExcelComponent {
     }
   }
 
+  updateTextInStore(value) {
+    this.$dispatch(
+      actions.changeText({
+        id: this.selection.current.id(),
+        value,
+      })
+    );
+  }
+
   onInput(event) {
-    this.$emit('table:input', $(event.target));
+    this.updateTextInStore($(event.target).text());
+    // this.$emit('table:input', $(event.target));
   }
 }
