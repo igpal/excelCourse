@@ -4,6 +4,7 @@ import {
   TABLE_RESIZE,
   APPLY_STYLE,
   CHANGE_TITLE,
+  UPDATE_DATE,
 } from './types';
 
 export function rootReduser(state, action) {
@@ -39,6 +40,9 @@ export function rootReduser(state, action) {
 
     case CHANGE_TITLE:
       return { ...state, title: action.data };
+
+    case UPDATE_DATE:
+      return { ...state, openedDate: new Date().toJSON() };
     default:
       return state;
   }
